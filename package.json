@@ -1,0 +1,24 @@
+{
+  "name": "nyt-mini-crossword-converter",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker to fetch NYT Mini crossword and convert to IPUZ format",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev --remote",
+    "dev:local": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "keywords": [
+    "cloudflare",
+    "worker",
+    "crossword",
+    "nyt",
+    "ipuz"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^4.42.1"
+  }
+}

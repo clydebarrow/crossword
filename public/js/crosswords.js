@@ -621,6 +621,8 @@ function adjustColor(color, amount) {
 				this.jsxw = puzzle;
 				// metadata
 				this.title = puzzle.metadata.title || '';
+                this.date = puzzle.metadata.date || '';
+                console.log(puzzle.metadata);
 				this.author = puzzle.metadata.author || '';
 				this.copyright = puzzle.metadata.copyright || '';
 				this.crossword_type = puzzle.metadata.crossword_type;
@@ -788,7 +790,10 @@ function adjustColor(color, amount) {
 
 			completeLoad() {
 				$('.cw-header').html(`
-					<span class="cw-title">${escape(this.title)}</span>
+				    <a href="/">
+                        <img class="cw-home" alt="home" src="img/home.svg" />
+				    </a>
+					<span class="cw-title">${escape(this.date)}</span>
 					<span class="cw-author">by ${escape(this.author)}</span>
 				${ this.notes ? `<button class="cw-button cw-button-notes">Notes</button>` : '' }
 					<span class="cw-flex-spacer"></span>

@@ -159,6 +159,7 @@ function xw_read_ipuz(data) {
 	var width = data["dimensions"]["width"];
 	var metadata = {
 		'title': data['title'] || '',
+        'date': data['date'] || '',
 		'author': data['author'] || '',
 		'copyright': data['copyright'] || '',
 		'description': data.notes || data.intro || '',

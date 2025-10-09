@@ -126,6 +126,12 @@ input.cw-hidden-input {
 	background: #6aa9f4;
 	color: #fff;
 }
+.cw-home {
+    width: 24px;
+    height: 24px;
+    margin-right: 0.5em;
+    filter: invert(100%);
+}
 .cw-title,
 .cw-author,
 .cw-copyright {

@@ -1,6 +1,7 @@
 name = "nyt-mini-crossword-converter"
 main = "src/index.js"
 compatibility_date = "2024-01-01"
+workers_dev = false
 
 # Environment variables
 [vars]
@@ -12,10 +13,17 @@ binding = "CROSSWORD_BUCKET"
 bucket_name = "nyt-crosswords"
 preview_bucket_name = "nyt-crosswords"  # Use same bucket for dev
 
-# Optional: Add a cron trigger to automatically fetch daily
+[[routes]]
+pattern = "mini.stubbs.me"
+custom_domain = true
+
 [triggers]
-crons = ["0 4 * * *"]  # Run at 4 AM UTC daily
+crons = ["0 2 30 * *"]  # Run daily
 
 
 [assets]
 directory = "public"
+
+# wrangler.toml (wrangler v3.88.0^)
+[observability.logs]
+enabled = true

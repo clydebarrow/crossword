@@ -16,6 +16,16 @@ export default {
         },
       });
     }
+    
+    // Manual trigger for scheduled task (for testing)
+    if (url.pathname === '/cron/convert') {
+      try {
+        await handleConvert(request, env);
+        return new Response('Successfully processed scheduled task', { status: 200 });
+      } catch (error) {
+        return new Response(`Error in scheduled task: ${error.message}`, { status: 500 });
+      }
+    }
 
     // Route: Home page - list all crosswords
     if (url.pathname === '/' || url.pathname === '/index.html') {
@@ -29,13 +39,31 @@ export default {
 
     // Route: Convert and store new crossword
     if (url.pathname === '/convert' || url.pathname === '/api/convert') {
-      return handleConvert(request, env);
+      // Add CORS headers to the response
+      const response = await handleConvert(request, env);
+      const modifiedResponse = new Response(response.body, response);
+      modifiedResponse.headers.set('Access-Control-Allow-Origin', '*');
+      modifiedResponse.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+      modifiedResponse.headers.set('Access-Control-Allow-Headers', 'Content-Type');
+      return modifiedResponse;
     }
 
     // Default: show usage info
     return new Response('NYT Mini Crossword Converter\n\nRoutes:\n  / - Browse crosswords\n  /convert - Convert latest puzzle\n  /api/list - List files as JSON', {
       headers: { 'Content-Type': 'text/plain' },
     });
+  },
+  
+  // Scheduled event handler
+  async scheduled(event, env, ctx) {
+    // Only run on production
+    if (env.ENVIRONMENT === 'production') {
+      // Use the existing handleConvert function
+      const request = new Request('https://crossword.stubbs.me/convert');
+      await handleConvert(request, env);
+    }
+    
+    return new Response('Scheduled task completed');
   },
 };
 
@@ -390,6 +418,33 @@ async function generateHomePage(env) {
       transform: translateY(-2px);
       box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
     }
+    .puzzle-actions {
+      display: flex;
+      gap: 8px;
+      margin: 5px 0;
+    }
+    .puzzle-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 0.9em;
+      transition: all 0.2s;
+    }
+    .puzzle-action.view {
+      background: #667eea;
+      color: white;
+    }
+    .puzzle-action.download {
+      background: #e2e8f0;
+      color: #2d3748;
+    }
+    .puzzle-action:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
     .stats {
       margin-top: 30px;
       padding: 20px;
@@ -424,11 +479,17 @@ async function generateHomePage(env) {
     ${latest ? `
     <div class="latest">
       <h2>📅 Latest Puzzle</h2>
-      <a href="${latest.url}" target="_blank">${latest.date}</a>
+      <div class="puzzle-actions" style="margin-top: 10px;">
+        <a href="#" class="puzzle-action view" 
+           onclick="event.preventDefault(); window.open('https://frozenpandaman.github.io/puz/?file=${encodeURIComponent('https://crossword.stubbs.me/nyt-mini-' + latest.date + '.ipuz')}', '_blank');">
+          ${latest.date}
+        </a>
+        <a href="${latest.url}" class="puzzle-action download" download>
+          ⬇️ Download
+        </a>
+      </div>
     </div>
     ` : '<p>No puzzles available yet.</p>'}
-    
-    <a href="/convert" class="convert-btn">🔄 Convert Latest Puzzle</a>
     
     <div class="archive">
       <h2>📚 Archive</h2>
@@ -441,12 +502,20 @@ async function generateHomePage(env) {
             <div class="month-section">
               <div class="month-header">
                 <span class="month-name">${monthNames[parseInt(month) - 1]}</span>
-                <select onchange="if(this.value) window.open(this.value, '_blank')">
-                  <option value="">Select day...</option>
+                <div style="flex: 1; display: flex; flex-wrap: wrap; gap: 8px;">
                   ${monthPuzzles.map(p => `
-                    <option value="${p.url}">${month}/${p.day}</option>
+                    <div class="puzzle-actions">
+                      <a href="#" class="puzzle-action view" 
+                         data-date="${p.date}"
+                         onclick="event.preventDefault(); window.open('https://frozenpandaman.github.io/puz/?file=${encodeURIComponent('https://crossword.stubbs.me/nyt-mini-' + p.date + '.ipuz')}', '_blank');">
+                        ${p.day}
+                      </a>
+                      <a href="${p.url}" class="puzzle-action download" download>
+                        ⬇️
+                      </a>
+                    </div>
                   `).join('')}
-                </select>
+                </div>
               </div>
             </div>
             `;

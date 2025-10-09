@@ -15,3 +15,7 @@ preview_bucket_name = "nyt-crosswords"  # Use same bucket for dev
 # Optional: Add a cron trigger to automatically fetch daily
 [triggers]
 crons = ["0 4 * * *"]  # Run at 4 AM UTC daily
+
+
+[assets]
+directory = "public"

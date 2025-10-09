@@ -481,7 +481,7 @@ async function generateHomePage(env) {
       <h2>📅 Latest Puzzle</h2>
       <div class="puzzle-actions" style="margin-top: 10px;">
         <a href="#" class="puzzle-action view" 
-           onclick="event.preventDefault(); window.open('https://frozenpandaman.github.io/puz/?file=${encodeURIComponent('https://crossword.stubbs.me/nyt-mini-' + latest.date + '.ipuz')}', '_blank');">
+           onclick="event.preventDefault(); window.open('viewer.html?file=${encodeURIComponent('https://crossword.stubbs.me/nyt-mini-' + latest.date + '.ipuz')}', '_blank');">
           ${latest.date}
         </a>
         <a href="${latest.url}" class="puzzle-action download" download>
@@ -507,7 +507,7 @@ async function generateHomePage(env) {
                     <div class="puzzle-actions">
                       <a href="#" class="puzzle-action view" 
                          data-date="${p.date}"
-                         onclick="event.preventDefault(); window.open('https://frozenpandaman.github.io/puz/?file=${encodeURIComponent('https://crossword.stubbs.me/nyt-mini-' + p.date + '.ipuz')}', '_blank');">
+                         onclick="event.preventDefault(); window.open('viewer.html?file=${encodeURIComponent('https://crossword.stubbs.me/nyt-mini-' + p.date + '.ipuz')}', '_blank');">
                         ${p.day}
                       </a>
                       <a href="${p.url}" class="puzzle-action download" download>

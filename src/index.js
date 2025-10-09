@@ -473,7 +473,7 @@ async function generateHomePage(env) {
 </head>
 <body>
   <div class="container">
-    <h1>🧩 NYT Mini Crossword Archive</h1>
+    <h1>🧩 Mini Crossword Archive</h1>
     <p class="subtitle">Browse and download converted IPUZ puzzles</p>
     
     ${latest ? `

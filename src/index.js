@@ -184,7 +184,7 @@ function convertToIPUZ(puzzleData, rootData) {
       } else {
         // White square with optional label
         if (cell.label) {
-          puzzleRow.push({ cell: 0, value: 0, style: { label: cell.label } });
+          puzzleRow.push(parseInt(cell.label));
         } else {
           puzzleRow.push(0);
         }

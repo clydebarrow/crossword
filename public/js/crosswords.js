@@ -622,7 +622,6 @@ function adjustColor(color, amount) {
 				// metadata
 				this.title = puzzle.metadata.title || '';
                 this.date = puzzle.metadata.date || '';
-                console.log(puzzle.metadata);
 				this.author = puzzle.metadata.author || '';
 				this.copyright = puzzle.metadata.copyright || '';
 				this.crossword_type = puzzle.metadata.crossword_type;
@@ -677,7 +676,7 @@ function adjustColor(color, amount) {
 					}
 					c.shape = c['background-shape'];
 
-					if (c.color && c.color != this.config.color_none) {
+					if (c.color && c.color !== this.config.color_none) {
 						c.shade_highlight_color = averageColors(this.config.color_word, adjustColor(c.color, -50));
 					}
 

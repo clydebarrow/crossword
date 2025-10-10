@@ -132,36 +132,46 @@ function convertSMHToIPUZ(smhPuzzle) {
     ipuz.solution.push(solutionRow);
   }
 
-  // Second pass: process clues if available, or generate them
-  if (smhPuzzle.game.clues) {
+  // Second pass: process clues from SMH format
+  const { clues: smhClues } = smhPuzzle.game;
+  
+  if (smhClues) {
     // Process across clues
-    if (smhPuzzle.game.clues.across) {
-      smhPuzzle.game.clues.across.forEach(clue => {
-        const cellNumber = cellMap[`${clue.col || 0},${clue.row || 0}`];
-        if (cellNumber) {
-          ipuz.clues.across.push({
-            number: cellNumber,
-            clue: clue.question || '',
-            answer: clue.answer || '',
-            row: clue.row || 0,
-            col: clue.col || 0
-          });
+    if (Array.isArray(smhClues.across)) {
+      smhClues.across.forEach(clue => {
+        // Find the cell with this position number
+        for (const [coord, number] of Object.entries(cellMap)) {
+          if (number === clue.position) {
+            const [col, row] = coord.split(',').map(Number);
+            ipuz.clues.across.push({
+              number: number,
+              clue: clue.question || '',
+              answer: '', // Will be filled from the grid
+              row: row,
+              col: col
+            });
+            break;
+          }
         }
       });
     }
 
     // Process down clues
-    if (smhPuzzle.game.clues.down) {
-      smhPuzzle.game.clues.down.forEach(clue => {
-        const cellNumber = cellMap[`${clue.col || 0},${clue.row || 0}`];
-        if (cellNumber) {
-          ipuz.clues.down.push({
-            number: cellNumber,
-            clue: clue.question || '',
-            answer: clue.answer || '',
-            row: clue.row || 0,
-            col: clue.col || 0
-          });
+    if (Array.isArray(smhClues.down)) {
+      smhClues.down.forEach(clue => {
+        // Find the cell with this position number
+        for (const [coord, number] of Object.entries(cellMap)) {
+          if (number === clue.position) {
+            const [col, row] = coord.split(',').map(Number);
+            ipuz.clues.down.push({
+              number: number,
+              clue: clue.question || '',
+              answer: '', // Will be filled from the grid
+              row: row,
+              col: col
+            });
+            break;
+          }
         }
       });
     }
@@ -223,8 +233,8 @@ function convertSMHToIPUZ(smhPuzzle) {
   ipuz.clues.down.sort((a, b) => a.number - b.number);
 
   // Format clues as strings (number. clue)
-  ipuz.clues.across = ipuz.clues.across.map(c => `${c.number}. ${c.clue || ''}`);
-  ipuz.clues.down = ipuz.clues.down.map(c => `${c.number}. ${c.clue || ''}`);
+  ipuz.clues.across = ipuz.clues.across.map(c => [`${c.number}`, `${c.clue || ''}`]);
+  ipuz.clues.down = ipuz.clues.down.map(c => [`${c.number}`, `${c.clue || ''}`]);
 
   return ipuz;
 }

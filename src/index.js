@@ -78,15 +78,37 @@ async function handleHomePage(env) {
 }
 
 /**
- * Handle the list API endpoint
+ * Handle the latest API endpoint
  */
-async function handleListAPI(env) {
-  const files = await listAllFiles(env);
-  return new Response(JSON.stringify(files, null, 2), {
-    headers: {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-    },
+async function handleLatest(request, env) {
+  const url = new URL(request.url);
+  const type = url.pathname.split('/').pop();
+  const formattedDate = new Date().toISOString().split('T')[0];
+  
+  // Try to get the latest puzzle from each type
+  const puzzleTypes = [
+    { prefix: 'nyt-mini', name: 'NYT Mini' },
+    { prefix: 'smh-crossword_mini', name: 'SMH Mini' },
+    { prefix: 'smh-crossword_quick', name: 'SMH Quick' },
+    { prefix: 'smh-crossword_cryptic', name: 'SMH Cryptic' }
+  ];
+
+  for (const puzzleType of puzzleTypes) {
+    const latest = await env.CROSSWORD_BUCKET.get(`${puzzleType.prefix}-${formattedDate}.ipuz`);
+    if (latest) {
+      const latestData = await latest.json();
+      return new Response(JSON.stringify({
+        ...latestData,
+        source: puzzleType.name
+      }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+  }
+  
+  return new Response(JSON.stringify({ error: 'No puzzles found' }), {
+    status: 404,
+    headers: { 'Content-Type': 'application/json' },
   });
 }
 
@@ -287,50 +309,121 @@ async function listAllFiles(env) {
 }
 
 /**
- * Generate the home page HTML
+ * Generate the home page HTML with tabbed interface for different puzzle types
  */
 async function generateHomePage(env) {
   const files = await listAllFiles(env);
   const bucketUrl = env.PUBLIC_BUCKET_URL || 'https://pub-<your-id>.r2.dev';
   
-  // Parse dates and organize by year/month
-  const puzzles = files
-    .filter(f => f.key.startsWith('nyt-mini-'))
-    .map(f => {
-      const match = f.key.match(/nyt-mini-(\d{4})-(\d{2})-(\d{2})\.ipuz/);
-      if (match) {
-        return {
-          key: f.key,
-          date: `${match[1]}-${match[2]}-${match[3]}`,
-          year: match[1],
-          month: match[2],
-          day: match[3],
-          url: `${bucketUrl}/${f.key}`,
-          uploaded: f.uploaded,
-        };
-      }
-      return null;
-    })
-    .filter(p => p !== null)
-    .sort((a, b) => b.date.localeCompare(a.date));
+  // Define puzzle types and their display names
+  const puzzleTypes = [
+    { id: 'nyt-mini', name: 'NYT Mini' },
+    { id: 'smh-crossword_mini', name: 'SMH Mini' },
+    { id: 'smh-crossword_quick', name: 'SMH Quick' },
+    { id: 'smh-crossword_cryptic', name: 'SMH Cryptic' }
+  ];
+
+  // Process all puzzle types
+  const puzzlesByType = {};
   
-  // Group by year and month
-  const byYear = {};
-  puzzles.forEach(p => {
-    if (!byYear[p.year]) byYear[p.year] = {};
-    if (!byYear[p.year][p.month]) byYear[p.year][p.month] = [];
-    byYear[p.year][p.month].push(p);
-  });
+  for (const type of puzzleTypes) {
+    const typePuzzles = files
+      .filter(f => f.key.startsWith(`${type.id}-`))
+      .map(f => {
+        const match = f.key.match(/([^-]+)-(\d{4})-(\d{2})-(\d{2})\.ipuz/);
+        if (match) {
+          const [_, puzzleType, year, month, day] = match;
+          return {
+            key: f.key,
+            type: type.id,
+            typeName: type.name,
+            date: `${year}-${month}-${day}`,
+            year,
+            month,
+            day,
+            url: `${bucketUrl}/${f.key}`,
+            uploaded: f.uploaded,
+          };
+        }
+        return null;
+      })
+      .filter(p => p !== null)
+      .sort((a, b) => b.date.localeCompare(a.date));
+    
+    // Group by year and month for archive view
+    const byYear = {};
+    typePuzzles.forEach(p => {
+      if (!byYear[p.year]) byYear[p.year] = {};
+      if (!byYear[p.year][p.month]) byYear[p.year][p.month] = [];
+      byYear[p.year][p.month].push(p);
+    });
+    
+    puzzlesByType[type.id] = {
+      name: type.name,
+      latest: typePuzzles[0] || null,
+      byYear,
+      all: typePuzzles
+    };
+  }
   
-  const latest = puzzles[0];
-  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  
+  // Generate HTML for each tab content
+  const tabContents = puzzleTypes.map(type => {
+    const typeData = puzzlesByType[type.id];
+    if (!typeData || !typeData.latest) {
+      return `
+        <div id="${type.id}" class="tab-content">
+          <div class="latest">
+            <h2>Latest ${type.name} Puzzle</h2>
+            <p>No puzzles available yet.</p>
+          </div>
+        </div>`;
+    }
+    
+    return `
+      <div id="${type.id}" class="tab-content ${type.id === 'nyt-mini' ? 'active' : ''}">
+        <div class="latest">
+          <h2>Latest ${type.name} Puzzle</h2>
+          <div class="puzzle">
+            <a href="/viewer.html?puzzle=${encodeURIComponent(typeData.latest.url)}" class="puzzle-link">
+              <span class="date">${new Date(typeData.latest.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+              <span class="view">Solve &rarr;</span>
+            </a>
+          </div>
+        </div>
+        <div class="archive">
+          <h2>Archive</h2>
+          ${Object.entries(typeData.byYear).sort(([a], [b]) => b - a).map(([year, months]) => `
+            <div class="year">
+              <h3>${year}</h3>
+              <div class="months">
+                ${Object.entries(months).sort((a, b) => b[0] - a[0]).map(([month, puzzles]) => `
+                  <div class="month">
+                    <h4>${monthNames[parseInt(month) - 1]}</h4>
+                    <div class="puzzles">
+                      ${puzzles.map(puzzle => `
+                        <a href="/viewer.html?puzzle=${encodeURIComponent(puzzle.url)}" class="puzzle-link">
+                          <span class="date">${puzzle.day}</span>
+                        </a>
+                      `).join('')}
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>`;
+  }).join('\n');
   
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NYT Mini Crossword Archive</title>
+  <title>Crossword Archive</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -357,6 +450,44 @@ async function generateHomePage(env) {
       margin-bottom: 30px;
       font-size: 1.1em;
     }
+    
+    /* Tabs */
+    .tabs {
+      display: flex;
+      margin-bottom: 20px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .tab {
+      padding: 10px 20px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      border-bottom: none;
+      border-radius: 6px 6px 0 0;
+      margin-right: 5px;
+      background: #f7fafc;
+      color: #4a5568;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    .tab:hover {
+      background: #edf2f7;
+    }
+    .tab.active {
+      background: white;
+      border-color: #e2e8f0;
+      border-bottom-color: white;
+      color: #2d3748;
+      margin-bottom: -1px;
+    }
+    
+    .tab-content {
+      display: none;
+      padding: 20px 0;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    
     .latest {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
@@ -365,19 +496,30 @@ async function generateHomePage(env) {
       margin-bottom: 30px;
     }
     .latest h2 {
-      margin-bottom: 10px;
+      margin-bottom: 15px;
       font-size: 1.5em;
     }
-    .latest a {
+    .puzzle-link {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       color: white;
       text-decoration: none;
-      font-size: 1.2em;
-      font-weight: bold;
-      border-bottom: 2px solid rgba(255,255,255,0.5);
-      transition: border-color 0.3s;
+      padding: 15px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.2);
     }
-    .latest a:hover {
-      border-bottom-color: white;
+    .puzzle-link:last-child {
+      border-bottom: none;
+    }
+    .puzzle-link:hover {
+      text-decoration: underline;
+    }
+    .puzzle-link .view {
+      opacity: 0.8;
+      font-size: 0.9em;
+    }
+    .puzzle-link:hover .view {
+      opacity: 1;
     }
     .archive {
       margin-top: 40px;
@@ -387,177 +529,98 @@ async function generateHomePage(env) {
       margin-bottom: 20px;
       font-size: 1.8em;
     }
-    .year-section {
+    .year {
       margin-bottom: 30px;
     }
-    .year-header {
-      background: #f7fafc;
-      padding: 15px 20px;
-      border-radius: 8px;
-      font-size: 1.3em;
-      font-weight: bold;
-      color: #2d3748;
+    .year h3 {
+      color: #4a5568;
       margin-bottom: 15px;
+      font-size: 1.4em;
     }
-    .month-section {
-      margin-bottom: 20px;
-      padding-left: 20px;
+    .months {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 20px;
     }
-    .month-header {
+    .month {
+      background: #f8fafc;
+      border-radius: 8px;
+      padding: 15px;
+    }
+    .month h4 {
+      color: #4a5568;
+      margin-bottom: 10px;
+      font-size: 1.1em;
+    }
+    .puzzles {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+      gap: 8px;
+    }
+    .puzzles a {
       display: flex;
       align-items: center;
-      gap: 15px;
-      margin-bottom: 10px;
-    }
-    .month-name {
-      font-weight: 600;
-      color: #4a5568;
-      font-size: 1.1em;
-      min-width: 80px;
-    }
-    select {
-      padding: 8px 12px;
-      border: 2px solid #e2e8f0;
-      border-radius: 6px;
-      font-size: 1em;
-      cursor: pointer;
+      justify-content: center;
       background: white;
-      transition: border-color 0.3s;
+      color: #4a5568;
+      text-decoration: none;
+      height: 36px;
+      border-radius: 6px;
+      transition: all 0.2s;
+      border: 1px solid #e2e8f0;
     }
-    select:hover {
-      border-color: #667eea;
-    }
-    select:focus {
-      outline: none;
-      border-color: #667eea;
-    }
-    .day-link {
-      display: inline-block;
-      margin: 5px;
-      padding: 8px 16px;
+    .puzzles a:hover {
       background: #edf2f7;
       color: #2d3748;
-      text-decoration: none;
-      border-radius: 6px;
-      transition: all 0.3s;
-      font-weight: 500;
     }
-    .day-link:hover {
-      background: #667eea;
-      color: white;
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-    }
-    .puzzle-actions {
-      display: flex;
-      gap: 8px;
-      margin: 5px 0;
-    }
-    .puzzle-action {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 6px 12px;
-      border-radius: 6px;
-      text-decoration: none;
-      font-size: 0.9em;
-      transition: all 0.2s;
-    }
-    .puzzle-action.view {
-      background: #667eea;
-      color: white;
-    }
-    .puzzle-action.download {
-      background: #e2e8f0;
-      color: #2d3748;
-    }
-    .puzzle-action:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-    .stats {
-      margin-top: 30px;
-      padding: 20px;
-      background: #f7fafc;
-      border-radius: 8px;
-      text-align: center;
-      color: #4a5568;
-    }
-    .convert-btn {
-      display: inline-block;
-      margin-top: 20px;
-      padding: 12px 24px;
-      background: #48bb78;
-      color: white;
-      text-decoration: none;
-      border-radius: 8px;
-      font-weight: bold;
-      transition: all 0.3s;
-    }
-    .convert-btn:hover {
-      background: #38a169;
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(72, 187, 120, 0.4);
+    @media (max-width: 768px) {
+      .container {
+        padding: 20px;
+      }
+      .tabs {
+        flex-wrap: wrap;
+      }
+      .tab {
+        margin-bottom: 5px;
+      }
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>🧩 Mini Crossword Archive</h1>
-    <p class="subtitle">Browse and download converted IPUZ puzzles</p>
+    <h1>Crossword Archive</h1>
+    <p class="subtitle">Browse and solve puzzles from different sources</p>
     
-    ${latest ? `
-    <div class="latest">
-      <h2>📅 Latest Puzzle</h2>
-      <div class="puzzle-actions" style="margin-top: 10px;">
-        <a href="#" class="puzzle-action view" 
-           onclick="event.preventDefault(); window.open('viewer.html?file=${encodeURIComponent('https://crossword.stubbs.me/nyt-mini-' + latest.date + '.ipuz')}', '_blank');">
-          ${latest.date}
-        </a>
-        <a href="${latest.url}" class="puzzle-action download" download>
-          ⬇️ Download
-        </a>
-      </div>
-    </div>
-    ` : '<p>No puzzles available yet.</p>'}
-    
-    <div class="archive">
-      <h2>📚 Archive</h2>
-      ${Object.keys(byYear).sort((a, b) => b - a).map(year => `
-        <div class="year-section">
-          <div class="year-header">${year}</div>
-          ${Object.keys(byYear[year]).sort((a, b) => b - a).map(month => {
-            const monthPuzzles = byYear[year][month];
-            return `
-            <div class="month-section">
-              <div class="month-header">
-                <span class="month-name">${monthNames[parseInt(month) - 1]}</span>
-                <div style="flex: 1; display: flex; flex-wrap: wrap; gap: 8px;">
-                  ${monthPuzzles.map(p => `
-                    <div class="puzzle-actions">
-                      <a href="#" class="puzzle-action view" 
-                         data-date="${p.date}"
-                         onclick="event.preventDefault(); window.open('viewer.html?file=${encodeURIComponent('https://crossword.stubbs.me/nyt-mini-' + p.date + '.ipuz')}', '_blank');">
-                        ${p.day}
-                      </a>
-                      <a href="${p.url}" class="puzzle-action download" download>
-                        ⬇️
-                      </a>
-                    </div>
-                  `).join('')}
-                </div>
-              </div>
-            </div>
-            `;
-          }).join('')}
+    <div class="tabs" id="puzzleTabs">
+      ${puzzleTypes.map(type => `
+        <div class="tab ${type.id === 'nyt-mini' ? 'active' : ''}" data-tab="${type.id}">
+          ${type.name}
         </div>
       `).join('')}
     </div>
     
-    <div class="stats">
-      <strong>${puzzles.length}</strong> puzzle${puzzles.length !== 1 ? 's' : ''} available
-    </div>
+    ${tabContents}
   </div>
+  
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const tabs = document.querySelectorAll('.tab');
+      const tabContents = document.querySelectorAll('.tab-content');
+      
+      tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          // Remove active class from all tabs and contents
+          tabs.forEach(t => t.classList.remove('active'));
+          tabContents.forEach(c => c.classList.remove('active'));
+          
+          // Add active class to clicked tab and corresponding content
+          tab.classList.add('active');
+          const tabId = tab.getAttribute('data-tab');
+          document.getElementById(tabId).classList.add('active');
+        });
+      });
+    });
+    </script>
 </body>
 </html>`;
 }

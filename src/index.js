@@ -607,20 +607,44 @@ async function generateHomePage(env) {
       const tabs = document.querySelectorAll('.tab');
       const tabContents = document.querySelectorAll('.tab-content');
       
+      // Function to set active tab
+      const setActiveTab = (tabId) => {
+        // Remove active class from all tabs and contents
+        tabs.forEach(t => t.classList.remove('active'));
+        tabContents.forEach(c => c.classList.remove('active'));
+        
+        // Add active class to selected tab and corresponding content
+        const selectedTab = document.querySelector('.tab[data-tab="' + tabId + '"]');
+        if (selectedTab) {
+          selectedTab.classList.add('active');
+          document.getElementById(tabId).classList.add('active');
+          // Save to localStorage
+          localStorage.setItem('selectedTab', tabId);
+        } else {
+          // Default to first tab if saved tab not found
+          const defaultTab = tabs[0];
+          if (defaultTab) {
+            const defaultTabId = defaultTab.getAttribute('data-tab');
+            defaultTab.classList.add('active');
+            document.getElementById(defaultTabId).classList.add('active');
+            localStorage.setItem('selectedTab', defaultTabId);
+          }
+        }
+      };
+      
+      // Set initial active tab from localStorage or default to first tab
+      const savedTab = localStorage.getItem('selectedTab');
+      setActiveTab(savedTab || 'nyt-mini');
+      
+      // Add click handlers to all tabs
       tabs.forEach(tab => {
         tab.addEventListener('click', () => {
-          // Remove active class from all tabs and contents
-          tabs.forEach(t => t.classList.remove('active'));
-          tabContents.forEach(c => c.classList.remove('active'));
-          
-          // Add active class to clicked tab and corresponding content
-          tab.classList.add('active');
           const tabId = tab.getAttribute('data-tab');
-          document.getElementById(tabId).classList.add('active');
+          setActiveTab(tabId);
         });
       });
     });
-    </script>
+  </script>
 </body>
 </html>`;
 }

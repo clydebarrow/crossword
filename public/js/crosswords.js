@@ -2453,7 +2453,7 @@ function adjustColor(color, amount) {
 						this.dir = data.dir;
 						this.cell_ranges = data.cell_ranges;
 						this.clue = data.clue;
-						this.refs_raw = data.clue.refs;
+						this.refs_raw = null;
 						this.parseRanges();
 					} else {
 						load_error = true;

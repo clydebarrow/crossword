@@ -91,7 +91,7 @@ function convertSMHToIPUZ(smhPuzzle) {
     author: smhPuzzle.author || '',
     copyright: 'SMH',
     publisher: 'Sydney Morning Herald',
-    date: smhPuzzle.date || new Date().toISOString().split('T')[0]
+    date: new Intl.DateTimeFormat('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(smhPuzzle.date || Date.now())),
   };
 
   // Process the grid and solution
@@ -233,10 +233,18 @@ function convertSMHToIPUZ(smhPuzzle) {
   ipuz.clues.down.sort((a, b) => a.number - b.number);
 
   // Format clues as strings (number. clue)
-  ipuz.clues.across = ipuz.clues.across.map(c => [`${c.number}`, `${c.clue || ''}`]);
-  ipuz.clues.down = ipuz.clues.down.map(c => [`${c.number}`, `${c.clue || ''}`]);
+  ipuz.clues = {
+      Across: ipuz.clues.across.map(c => [`${c.number}`, `${c.clue || ''}`]),
+      Down: ipuz.clues.down.map(c => [`${c.number}`, `${c.clue || ''}`]),
+  };
 
   return ipuz;
 }
 
-export { fetchSMHCrosswords, convertSMHToIPUZ };
+// Helper function to format date as MM/DD/YYYY
+function formatDateMMDDYYYY(dateStr) {
+  const [year, month, day] = dateStr.split('-');
+  return `${month}/${day}/${year}`;
+}
+
+export { fetchSMHCrosswords, convertSMHToIPUZ, formatDateMMDDYYYY };

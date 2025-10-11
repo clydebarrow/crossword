@@ -1,6 +1,7 @@
 /**
  * Cloudflare Worker to fetch NYT Mini crossword and convert to IPUZ format
  */
+import {convertSMHToIPUZ, fetchSMHCrosswords} from "./smhApi";
 
 export default {
   async fetch(request, env, ctx) {
@@ -62,7 +63,6 @@ export default {
       const request = new Request('https://crossword.stubbs.me/convert');
       await handleConvert(request, env);
     }
-    
     return new Response('Scheduled task completed');
   },
 };
@@ -107,6 +107,35 @@ async function handleConvert(request, env) {
       
       // Convert to IPUZ format (pass both puzzleData and root-level metadata)
       const ipuzData = convertToIPUZ(puzzleData, nytData);
+      
+      // Fetch, convert, and store the three SMH crosswords
+      const smhCrosswords = await fetchSMHCrosswords();
+      const smhPuzzles = smhCrosswords.puzzles.map(crossword => ({
+        ...convertSMHToIPUZ(crossword),
+        originalData: crossword // Keep original data for metadata
+      }));
+      
+      const smhFilenames = smhPuzzles.map((puzzle, index) => {
+        // Use difficulty from original data or fallback to index
+        const puzzleType = puzzle.originalData?.difficulty?.toLowerCase() || `puzzle-${index + 1}`;
+        const date = puzzle.originalData?.date || new Date().toISOString().split('T')[0];
+        return `smh-${puzzleType}-${date}.ipuz`;
+      });
+      
+      await Promise.all(smhPuzzles.map((puzzle, index) => {
+          // Remove the originalData before saving
+          const {originalData, ...puzzleData} = puzzle;
+          return env.CROSSWORD_BUCKET.put(smhFilenames[index], JSON.stringify(puzzleData, null, 2), {
+              httpMetadata: {
+                  contentType: 'application/json',
+              },
+              customMetadata: {
+                  publicationDate: new Date().toISOString(),
+                  source: 'smh',
+                  uploadedAt: new Date().toISOString(),
+              },
+          });
+      }));
       
       // Generate filename from publication date (at root level)
       const publicationDate = nytData.publicationDate;
@@ -210,7 +239,8 @@ function convertToIPUZ(puzzleData, rootData) {
     
     ipuzClues[direction].push([clueNumber, clueText]);
   });
-  
+
+  const dateParts = publicationDate.split('-');
   // Construct IPUZ object
   const ipuz = {
     version: 'http://ipuz.org/v2',
@@ -220,7 +250,7 @@ function convertToIPUZ(puzzleData, rootData) {
     publication: 'The Mini Crossword',
     url: 'https://www.nytimes.com/crosswords/game/mini',
     uniqueid: `nyt-mini-${publicationDate}`,
-    date: publicationDate,
+    date: `${dateParts[1]}/${dateParts[2]}/${dateParts[0]}`,
     author: constructors ? constructors.join(', ') : undefined,
     editor: editor,
     dimensions: {

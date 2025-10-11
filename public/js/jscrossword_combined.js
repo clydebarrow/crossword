@@ -784,8 +784,10 @@ class xwGrid {
 				}
 				// end the across entry if we hit the edge
 				if (this.hasBlack(x, y, 'right')) {
-					// but first, remove it from our words list if there's no letters in it
-					if (typeof acrossEntries[thisNum] == 'undefined' || acrossEntries[thisNum]['word'] == '') {
+					// Remove the entry if it's a 1-letter word or empty
+					if (typeof acrossEntries[thisNum] == 'undefined' || 
+						acrossEntries[thisNum]['word'] === '' || 
+						acrossEntries[thisNum]['word'].length <= 1) {
 						delete acrossEntries[thisNum];
 					}
 					thisNum = null;
@@ -812,8 +814,10 @@ class xwGrid {
 				}
 				// end the down entry if we hit the bottom
 				if (this.hasBlack(x, y, 'bottom')) {
-					// but first, remove it from our words list if there's no letters in it
-					if (typeof downEntries[thisNum] == 'undefined' || downEntries[thisNum]['word'] == '') {
+					// Remove the entry if it's a 1-letter word or empty
+					if (typeof downEntries[thisNum] == 'undefined' || 
+						downEntries[thisNum]['word'] === '' || 
+						downEntries[thisNum]['word'].length <= 1) {
 						delete downEntries[thisNum];
 					}
 					thisNum = null;

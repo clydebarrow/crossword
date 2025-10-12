@@ -1182,7 +1182,9 @@ function adjustColor(color, amount) {
 				}
 
 				for (x in this.cells) {
+                    x = +x;
 					for (y in this.cells[x]) {
+                        y = +y;
 						var cell = this.cells[x][y],
 							cell_x = (x - 1) * this.cell_size + 1,
 							cell_y = (y - 1) * this.cell_size + 1;

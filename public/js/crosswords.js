@@ -982,42 +982,105 @@ function adjustColor(color, amount) {
 				const modalContent = `
 				<div class="modal-content">
 					<div class="modal-header">
-						<span class="modal-close">&times;</span>
+						<span class="modal-close" tabindex="0" aria-label="Close modal">&times;</span>
 					</div>
 					<div class="modal-body">
 						${content}
 					</div>
 					<div class="modal-footer">
-						<button class="cw-button" id="modal-button">${button_text}</button>
+						<button class="cw-button" id="modal-button" autofocus>${button_text}</button>
 					</div>
 				</div>`;
+				
 				// Set this to be the contents of the container modal div
-				this.root.find('.cw-modal').html(modalContent);
+				const modal = this.root.find('.cw-modal');
+				modal.html(modalContent);
 
-				// Show the div
-				var modal = this.root.find('.cw-modal').get(0);
-				modal.style.display = 'block';
+				// Show the div and make it focusable
+				const modalElement = modal.get(0);
+				modalElement.style.display = 'block';
+				modalElement.setAttribute('role', 'dialog');
+				modalElement.setAttribute('aria-modal', 'true');
 
-				// Allow user to close the div
-				const this_hidden_input = this.hidden_input;
-				var span = this.root.find('.modal-close').get(0);
-				// When the user clicks on <span> (x), close the modal
-				span.onclick = function () {
-					modal.style.display = 'none';
-					this_hidden_input.focus();
+				// Store the element that had focus before the modal opened
+				const previousFocus = document.activeElement;
+
+				// Close modal function that handles cleanup
+				const closeModal = () => {
+					modal.hide();
+					document.removeEventListener('keydown', handleKeyDown);
+					// Restore focus to the previously focused element
+					if (previousFocus) {
+						previousFocus.focus();
+					} else {
+						this.hidden_input.focus();
+					}
 				};
+
+				// Close modal when clicking the close button or the close button
+				const closeButton = modal.find('.modal-close');
+				const modalButton = modal.find('#modal-button');
+				
+				closeButton.on('click', closeModal);
+				modalButton.on('click', closeModal);
+
+				// Close modal when clicking outside the modal content
+				modal.on('click', (e) => {
+					if (e.target === modalElement) {
+						closeModal();
+					}
+				});
+
+				// Handle keyboard events
+				const handleKeyDown = (e) => {
+					switch (e.key) {
+						case 'Escape':
+							e.preventDefault();
+							e.stopPropagation();
+							closeModal();
+							break;
+						case 'Enter':
+							// Only handle Enter if not in a form element
+							if (!['TEXTAREA', 'INPUT', 'SELECT', 'BUTTON'].includes(document.activeElement.tagName)) {
+								e.preventDefault();
+								e.stopPropagation();
+								closeModal();
+							}
+							break;
+						case 'Tab':
+							// Trap focus within the modal
+							const focusableElements = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+							const focusableContent = modal.find(focusableElements);
+							const firstFocusableElement = focusableContent[0];
+							const lastFocusableElement = focusableContent[focusableContent.length - 1];
+
+							if (e.shiftKey) { // if shift key pressed for shift + tab combination
+								if (document.activeElement === firstFocusableElement) {
+									lastFocusableElement.focus(); // add focus to the last focusable element
+									e.preventDefault();
+								}
+							} else { // if tab key is pressed
+								if (document.activeElement === lastFocusableElement) { // if focused has reached to last focusable element then focus first focusable element after pressing tab
+									firstFocusableElement.focus(); // add focus to the first focusable element
+									e.preventDefault();
+								}
+							}
+							break;
+					}
+				};
+
+				// Add the event listener with capture to catch events before they reach other elements
+				document.addEventListener('keydown', handleKeyDown, true);
+
+				// Set focus to the close button when modal opens
+				closeButton.focus();
+
 				// When the user clicks anywhere outside of the modal, close it
 				window.onclick = function (event) {
 					if (event.target === modal) {
 						modal.style.display = 'none';
 						this_hidden_input.focus();
 					}
-				};
-				// Clicking the button should close the modal
-				var modalButton = document.getElementById('modal-button');
-				modalButton.onclick = function () {
-					modal.style.display = 'none';
-					this_hidden_input.focus();
 				};
 			}
 

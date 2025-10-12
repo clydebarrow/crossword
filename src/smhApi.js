@@ -87,7 +87,7 @@ function convertSMHToIPUZ(smhPuzzle) {
       across: [],
       down: []
     },
-    title: (smhPuzzle.difficulty || 'SMH').replace(/^CROSSWORD_/, ''),
+    title: "SMH " + (smhPuzzle.difficulty || '').replace(/^CROSSWORD_/, ''),
     author: smhPuzzle.author || '',
     copyright: 'SMH',
     publisher: 'Sydney Morning Herald',

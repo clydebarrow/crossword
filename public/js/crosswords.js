@@ -230,7 +230,7 @@ function adjustColor(color, amount) {
 			xhr.open('GET', path);
 			xhr.responseType = 'blob';
 			xhr.onload = function () {
-				if (xhr.status == 200) {
+				if (xhr.status === 200) {
 					loadFromFile(xhr.response, type, deferred);
 				} else {
 					deferred.reject(ERR_FILE_LOAD);
@@ -333,36 +333,36 @@ function adjustColor(color, amount) {
 			if (entry && (solution.constructor === Array)) {
 				// go through the multiple answers. if any one is entered, it's correct
 				for (var i = 0; i < solution.length; i++) {
-					if (entry == solution[i]) {
+					if (entry === solution[i]) {
 						return true;
 					}
 				}
 				// if answer is a rebus & contains both answers in either order, that's fine too
 				// (only works for cells with 2 answers, not 3+, fyi...)
-				if (entry.length == 2 && solution.length == 2) {
-					if (entry[0] == solution[0] && entry[1] == solution[1])
+				if (entry.length === 2 && solution.length === 2) {
+					if (entry[0] === solution[0] && entry[1] === solution[1])
 						return true;
-					else if (entry[0] == solution[1] && entry[1] == solution[0]) // allow them to be switched, just in case
+					else if (entry[0] === solution[1] && entry[1] === solution[0]) // allow them to be switched, just in case
 						return true;
 				} // also fine to use `,` or `/` or similar as a delimiter in a rebus
-				else if (entry.length == 3 && solution.length == 2) {
-					if ((entry[0] == solution[0] && entry[2] == solution[1]) ||
-						(entry[0] == solution[1] && entry[2] == solution[0])) {
-						if (entry[1] == "/" || entry[1] == "," || entry[1] == "\\" || entry[1] == "|" || entry[1] == " ")
+				else if (entry.length === 3 && solution.length === 2) {
+					if ((entry[0] === solution[0] && entry[2] === solution[1]) ||
+						(entry[0] === solution[1] && entry[2] === solution[0])) {
+						if (entry[1] === "/" || entry[1] === "," || entry[1] === "\\" || entry[1] === "|" || entry[1] === " ")
 							return true;
 					}
 				} // same as above but using `, ` as a delimiter
-				else if (entry.length == 4 && solution.length == 2) {
-					if ((entry[0] == solution[0] && entry[3] == solution[1]) ||
-						(entry[0] == solution[1] && entry[3] == solution[0])) {
-						if (entry[1] == "," && entry[2] == " ")
+				else if (entry.length === 4 && solution.length === 2) {
+					if ((entry[0] === solution[0] && entry[3] === solution[1]) ||
+						(entry[0] === solution[1] && entry[3] === solution[0])) {
+						if (entry[1] === "," && entry[2] === " ")
 							return true;
 					}
 				}
 			}
 			// rebus or regular answer - needs to be an exact match
 			else {
-				return entry == solution;
+				return entry === solution;
 			}
 		}
 
@@ -545,7 +545,6 @@ function adjustColor(color, amount) {
 						).then(loaded_callback, error_callback);
 				} else {
 					// shows open button
-					var i, puzzle_file, el;
 
 					this.open_button = this.root.find('.cw-button-open-puzzle');
 					this.file_input = this.root.find('input[type="file"]');
@@ -621,15 +620,22 @@ function adjustColor(color, amount) {
 				this.jsxw = puzzle;
 				// metadata
 				this.title = puzzle.metadata.title || '';
-                this.date = puzzle.metadata.date || '';
-				this.author = puzzle.metadata.author || '';
+                this.author = puzzle.metadata.author || '';
+				const dateRegex = /^\d{2}\/\d{2}\/\d{4}$/;
+				const dateStr = puzzle.metadata.date || '';
+				if (dateRegex.test(dateStr)) {
+					const [month, day, year] = dateStr.split('/');
+					this.date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+				} else {
+					this.date = dateStr;
+				}
 				this.copyright = puzzle.metadata.copyright || '';
 				this.crossword_type = puzzle.metadata.crossword_type;
 
 				// determine whether we should autofill
 				if (
-					this.crossword_type == 'acrostic' ||
-					this.crossword_type == 'coded'
+					this.crossword_type === 'acrostic' ||
+					this.crossword_type === 'coded'
 				) {
 					this.is_autofill = true;
 				}
@@ -649,8 +655,8 @@ function adjustColor(color, amount) {
 				this.msg_solved = puzzle.metadata.completion_message || MSG_SOLVED;
 				/* cells */
 				this.cells = {};
-				for (var i=0; i < puzzle.cells.length; i++) {
-					var c = { ...puzzle.cells[i]}; // make a copy
+				for (var j= 0; j !== puzzle.cells.length; j++) {
+					var c = { ...puzzle.cells[j]}; // make a copy
 					c.x = c.x + 1;
 					c.y = c.y + 1;
 					if (!this.cells[c.x]) {
@@ -710,7 +716,6 @@ function adjustColor(color, amount) {
 					// Determine which word is an across and which is a down
 					// We do this by comparing the entry to the set of across entries
 					var thisGrid = new xwGrid(puzzle.cells);
-					var acrossEntries = thisGrid.acrossEntries();
 					var acrossEntries = thisGrid.acrossEntries();
 					var acrossSet = new Set(Object.keys(acrossEntries).map(function (x) {return acrossEntries[x].word;}))
 					var entry_mapping = puzzle.get_entry_mapping();
@@ -778,8 +783,7 @@ function adjustColor(color, amount) {
 						dir: word.dir,
 						refs_raw: null,
 						cell_ranges: word.cells.map(function (c) {
-							var obj = {x: (c[0] + 1).toString(), y: (c[1] + 1).toString()};
-							return obj;
+                            return {x: (c[0] + 1).toString(), y: (c[1] + 1).toString()};
 						}),
 						clue: clueMapping[word.id]
 					});
@@ -792,7 +796,7 @@ function adjustColor(color, amount) {
 				    <a href="/">
                         <img class="cw-home" alt="home" src="img/home.svg" />
 				    </a>
-					<span class="cw-title">${escape(this.date)}</span>
+					<span class="cw-title">${escape(this.title)} ${escape(this.date)}</span>
 					<span class="cw-author">by ${escape(this.author)}</span>
 				${ this.notes ? `<button class="cw-button cw-button-notes">Notes</button>` : '' }
 					<span class="cw-flex-spacer"></span>
@@ -955,7 +959,7 @@ function adjustColor(color, amount) {
 				this.hidden_input.on('keydown', $.proxy(this.keyPressed, this));
 			}
 
-			handleClickWindow(event) {
+			handleClickWindow(_event) {
 				this.root.find('.cw-menu').hide();
 			}
 
@@ -1004,7 +1008,7 @@ function adjustColor(color, amount) {
 				};
 				// When the user clicks anywhere outside of the modal, close it
 				window.onclick = function (event) {
-					if (event.target == modal) {
+					if (event.target === modal) {
 						modal.style.display = 'none';
 						this_hidden_input.focus();
 					}
@@ -1052,16 +1056,15 @@ function adjustColor(color, amount) {
 					this.selected_word = word;
 
 					// will error on unchecked squares
+                    var dir = 'A';
 					try {
-						if (word.cell_ranges[0]['x'] == word.cell_ranges[1]['x'])
-							var dir = 'D';
-						else
-							var dir = 'A';
+						if (word.cell_ranges[0]['x'] === word.cell_ranges[1]['x'])
+							dir = 'D';
 					} catch (e) {
-						if (word.dir == 'across')
-							var dir = 'A';
+						if (word.dir === 'across')
+							dir = 'A';
 						else
-							var dir = 'D';
+							dir = 'D';
 					}
 
 					this.top_text.html(`
@@ -1172,7 +1175,7 @@ function adjustColor(color, amount) {
 					var search_num = this.selected_word.refs_raw[0].number;
 					var search_dir = this.selected_word.refs_raw[0].direction.toLowerCase();
 					for (var i in this.words) {
-						if (this.words[i].clue.number == search_num && this.words[i].dir == search_dir) {
+						if (this.words[i].clue.number === search_num && this.words[i].dir === search_dir) {
 							var secondary_highlight_cells = this.words[i].cell_ranges;
 						}
 					}
@@ -1196,8 +1199,8 @@ function adjustColor(color, amount) {
 
 							// clue is referenced by some other one
 							if (secondary_highlight_cells &&
-								secondary_highlight_cells.some(c => c.x == cell.x) &&
-								secondary_highlight_cells.some(c => c.y == cell.y)) {
+								secondary_highlight_cells.some(c => c.x === cell.x) &&
+								secondary_highlight_cells.some(c => c.y === cell.y)) {
 								color = this.config.color_secondary;
 							}
 
@@ -1207,12 +1210,12 @@ function adjustColor(color, amount) {
 							}
 
 							// cell hover highlight
-							if (this.config.hover_enabled && x == this.hovered_x && y == this.hovered_y) {
+							if (this.config.hover_enabled && x === this.hovered_x && y === this.hovered_y) {
 								color = this.config.color_hover;
 							}
 
 							// selected cell yellow
-							if (this.selected_cell && x == this.selected_cell.x && y == this.selected_cell.y) {
+							if (this.selected_cell && x === this.selected_cell.x && y === this.selected_cell.y) {
 								color = this.config.color_selected;
 							}
 
@@ -1220,7 +1223,7 @@ function adjustColor(color, amount) {
 							//this.context.fillRect(cell_x, cell_y, this.cell_size, this.cell_size);
 							// In an autofill puzzle (coded and acrostic), highlight all other cells
 							// with the same number as the selected cell
-							if (this.is_autofill && cell.number == this.selected_cell.number && cell != this.selected_cell) {
+							if (this.is_autofill && cell.number === this.selected_cell.number && cell !== this.selected_cell) {
 								color = this.config.color_hilite;
 							}
 
@@ -1280,7 +1283,7 @@ function adjustColor(color, amount) {
 										this.cell_size
 									);
 									// we want a bounding box for blocks
-									if (cell.color != this.config.color_none) {
+									if (cell.color !== this.config.color_none) {
 										this.context.strokeRect(
 											cell_x,
 											cell_y,
@@ -1382,7 +1385,7 @@ function adjustColor(color, amount) {
 							this.context.font =
 								this.cell_size / (1.1 + 0.5 * cell_letter_length) +
 								'px sans-serif';
-							if (cell.revealed && cell.letter != '#' && cell.letter != '.') { // keep blocks black
+							if (cell.revealed && cell.letter !== '#' && cell.letter !== '.') { // keep blocks black
 								this.context.fillStyle = this.config.revealed_letter;
 							}
 							if (cell.checked) {
@@ -1445,7 +1448,7 @@ function adjustColor(color, amount) {
 					index_x = Math.ceil(mouse_x / this.cell_size),
 					index_y = Math.ceil(mouse_y / this.cell_size);
 
-				if (this.selected_cell && this.selected_cell.x == index_x && this.selected_cell.y == index_y) {
+				if (this.selected_cell && this.selected_cell.x === index_x && this.selected_cell.y === index_y) {
 					this.changeActiveClues();
 				}
 
@@ -1470,6 +1473,7 @@ function adjustColor(color, amount) {
 
 				// to prevent event propagation for specified keys
 				var prevent = [35, 36, 37, 38, 39, 40, 32, 46, 8, 9, 13].indexOf(e.keyCode) >= 0;
+                var rebus_entry;
 
 				switch (e.keyCode) {
 					case 35: // end
@@ -1538,13 +1542,13 @@ function adjustColor(color, amount) {
 						break;
 					case 27: // escape -- pulls up a rebus entry - same as promptRebus()
 						if (this.selected_cell && this.selected_word) {
-							var rebus_entry = prompt('Letters:', '');
+							rebus_entry = prompt('Letters:', '');
 							this.hiddenInputChanged(rebus_entry);
 						}
 						break;
 					case 45: // insert -- same as escape
 						if (this.selected_cell && this.selected_word) {
-							var rebus_entry = prompt('Letters:', '');
+							rebus_entry = prompt('Letters:', '');
 							this.hiddenInputChanged(rebus_entry);
 						}
 						break;
@@ -1570,15 +1574,15 @@ function adjustColor(color, amount) {
 						this.renderCells();
 						break;
 					case 9: // tab
-						var skip_filled_words = this.config.tab_key === 'tab_skip';
+						const tab_skip = this.config.tab_key === 'tab_skip';
 						if (e.shiftKey) { // previous word
-							this.moveToNextWord(true, skip_filled_words);
+							this.moveToNextWord(true, tab_skip);
 						} else {
-							this.moveToNextWord(false, skip_filled_words);
+							this.moveToNextWord(false, tab_skip);
 						}
 						break;
 					case 13: // enter key -- same as tab
-						var skip_filled_words = this.config.tab_key === 'tab_skip';
+						const skip_filled_words = this.config.tab_key === 'tab_skip';
 						if (e.shiftKey) {
 							this.moveToNextWord(true, skip_filled_words);
 						} else {
@@ -1780,7 +1784,7 @@ function adjustColor(color, amount) {
 
 			// callback for arrow keys - moves selection by one cell
 			// can change direction
-			moveSelectionBy(delta_x, delta_y, jumping_over_black) {
+			moveSelectionBy(delta_x, delta_y, _jumping_over_black) {
 				var x, y, new_cell;
 				if (this.selected_cell) {
 					x = this.selected_cell.x + delta_x;
@@ -2055,7 +2059,7 @@ function adjustColor(color, amount) {
 							if (event.target.type === 'checkbox') {
 								this.config[event.target.name] = event.target.checked;
 								// need to add a special bit for dark mode
-								if (event.target.name == 'dark_mode_enabled' && DarkReader) {
+								if (event.target.name === 'dark_mode_enabled' && DarkReader) {
 									if (event.target.checked) {
 										DarkReader.enable({
 											brightness: 100,
@@ -2116,8 +2120,7 @@ function adjustColor(color, amount) {
 			saveGame() {
 				this.fillJsXw(); // fill jsxw
 				const jsxw_str = JSON.stringify(this.jsxw); // stringify
-				const savegame_name = STORAGE_KEY;
-				localStorage.setItem(savegame_name, jsxw_str);
+                localStorage.setItem(STORAGE_KEY, jsxw_str);
 				this.createModalBox('Progress saved.');
 			}
 
@@ -2155,8 +2158,7 @@ function adjustColor(color, amount) {
 			/* Load a game from local storage */
 			loadGame() {
 				try {
-					var savegame_name = STORAGE_KEY;
-					var jsxw = JSON.parse(localStorage.getItem(savegame_name));
+                    var jsxw = JSON.parse(localStorage.getItem(STORAGE_KEY));
 					this.removeListeners();
 					this.parsePuzzle(jsxw);
 					this.createModalBox('Progress loaded.');
@@ -2171,9 +2173,9 @@ function adjustColor(color, amount) {
 				}
 			}
 
-			check_reveal(to_solve, reveal_or_check, e) {
+			check_reveal(to_solve, reveal_or_check, _e) {
 				var my_cells = [],
-					cell;
+					cell, i, j, coordinates;
 				switch (to_solve) {
 					case 'letter':
 						if (this.selected_cell) {
@@ -2182,7 +2184,6 @@ function adjustColor(color, amount) {
 						break;
 					case 'word':
 						if (this.selected_word) {
-							var i, coordinates, cell;
 							for (i = 0; (coordinates = this.selected_word.cells[i]); i++) {
 								cell = this.selected_word.getCellByCoordinates(coordinates);
 								if (cell) {
@@ -2192,7 +2193,6 @@ function adjustColor(color, amount) {
 						}
 						break;
 					case 'puzzle':
-						var i, j, cell;
 						for (i in this.cells) {
 							for (j in this.cells[i]) {
 								cell = this.cells[i][j];
@@ -2205,7 +2205,7 @@ function adjustColor(color, amount) {
 				// check and reveal also other numbers if autofill is on
 				if (this.is_autofill) {
 					var my_cells_length = my_cells.length;
-					for (var i = 0; i < my_cells_length; i++) {
+					for (i = 0; i < my_cells_length; i++) {
 						var my_number = my_cells[i].number;
 						if (my_number === null) {
 							continue;
@@ -2217,28 +2217,28 @@ function adjustColor(color, amount) {
 					}
 				}
 
-				for (var i = 0; i < my_cells.length; i++) {
+				for (i = 0; i < my_cells.length; i++) {
 					if (!my_cells[i].solution) {
 						continue;
 					}
 					if (
 						!isCorrect(my_cells[i].letter, my_cells[i].solution)
 					) {
-						if (reveal_or_check == 'reveal') {
+						if (reveal_or_check === 'reveal') {
 							my_cells[i].letter = my_cells[i].solution;
 							my_cells[i].revealed = true;
 							my_cells[i].checked = false;
-						} else if (reveal_or_check == 'check') {
+						} else if (reveal_or_check === 'check') {
 							my_cells[i].checked = true;
 						}
-					} else if (reveal_or_check == 'reveal' && isCorrect(my_cells[i].letter, my_cells[i].solution) && my_cells[i].letter !== my_cells[i].solution) {
+					} else if (reveal_or_check === 'reveal' && isCorrect(my_cells[i].letter, my_cells[i].solution) && my_cells[i].letter !== my_cells[i].solution) {
 						// i.e. the solution is "correct" but the letter doesn't match up
 						my_cells[i].letter = my_cells[i].solution;
 					}
 				}
 				this.renderCells();
 
-				if (reveal_or_check == 'reveal') {
+				if (reveal_or_check === 'reveal') {
 					this.checkIfSolved(false);
 				}
 				this.hidden_input.focus();
@@ -2341,9 +2341,9 @@ function adjustColor(color, amount) {
 						words.push(word);
 					}
 				}
-				if (words.length == 1) {
+				if (words.length === 1) {
 					return words[0];
-				} else if (words.length == 0) {
+				} else if (words.length === 0) {
 					return null;
 				} else {
 					// with more than one word we look for one
@@ -2352,13 +2352,13 @@ function adjustColor(color, amount) {
 					for (i = 0; i < words.length; i++) {
 						word = words[i];
 						if (change_word) {
-							if (word.id == this.crossword.selected_word.id) {
+							if (word.id === this.crossword.selected_word.id) {
 								finding_word = true;
 							} else if (finding_word) {
 								return word;
 							}
 						} else {
-							if (word.id == this.crossword.selected_word.id) {
+							if (word.id === this.crossword.selected_word.id) {
 								return word;
 							}
 						}
@@ -2367,16 +2367,12 @@ function adjustColor(color, amount) {
 					// just return the first one
 					return words[0];
 				}
-				return null;
 			}
 
 			// in clues list, marks clue for word that has cell with given coordinates
 			markActive(x, y, is_passive) {
 				var classname = is_passive ? 'passive' : 'active',
-					word = this.getMatchingWord(x, y),
-					clue_el,
-					clue_position,
-					clue_height;
+					word = this.getMatchingWord(x, y);
 				this.clues_container.find('div.cw-clue.active').removeClass('active');
 				this.clues_container.find('div.cw-clue.passive').removeClass('passive');
 				if (word) {
@@ -2520,7 +2516,7 @@ function adjustColor(color, amount) {
 				if (x && y) {
 					start = Math.max(0, this.cells.indexOf(`${x}-${y}`));
 					// if currently last cell - search from beginning
-					if (start == this.cells.length - 1) {
+					if (start === this.cells.length - 1) {
 						start = 0;
 					}
 				}

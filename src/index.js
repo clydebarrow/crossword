@@ -271,6 +271,7 @@ function convertToIPUZ(puzzleData, rootData) {
     uniqueid: `nyt-mini-${publicationDate}`,
     date: `${dateParts[1]}/${dateParts[2]}/${dateParts[0]}`,
     author: constructors ? constructors.join(', ') : undefined,
+    title: "NYT Mini",
     editor: editor,
     dimensions: {
       width: dimensions.width,

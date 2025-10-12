@@ -1008,8 +1008,6 @@ function adjustColor(color, amount) {
 				// Close modal function that handles cleanup
 				const closeModal = () => {
 					modal.hide();
-					document.removeEventListener('keydown', handleKeyDown);
-					// Restore focus to the previously focused element
 					if (previousFocus) {
 						previousFocus.focus();
 					} else {
@@ -1033,44 +1031,18 @@ function adjustColor(color, amount) {
 
 				// Handle keyboard events
 				const handleKeyDown = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
 					switch (e.key) {
 						case 'Escape':
-							e.preventDefault();
-							e.stopPropagation();
+                        case 'Enter':
 							closeModal();
-							break;
-						case 'Enter':
-							// Only handle Enter if not in a form element
-							if (!['TEXTAREA', 'INPUT', 'SELECT', 'BUTTON'].includes(document.activeElement.tagName)) {
-								e.preventDefault();
-								e.stopPropagation();
-								closeModal();
-							}
-							break;
-						case 'Tab':
-							// Trap focus within the modal
-							const focusableElements = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
-							const focusableContent = modal.find(focusableElements);
-							const firstFocusableElement = focusableContent[0];
-							const lastFocusableElement = focusableContent[focusableContent.length - 1];
-
-							if (e.shiftKey) { // if shift key pressed for shift + tab combination
-								if (document.activeElement === firstFocusableElement) {
-									lastFocusableElement.focus(); // add focus to the last focusable element
-									e.preventDefault();
-								}
-							} else { // if tab key is pressed
-								if (document.activeElement === lastFocusableElement) { // if focused has reached to last focusable element then focus first focusable element after pressing tab
-									firstFocusableElement.focus(); // add focus to the first focusable element
-									e.preventDefault();
-								}
-							}
 							break;
 					}
 				};
 
 				// Add the event listener with capture to catch events before they reach other elements
-				document.addEventListener('keydown', handleKeyDown, true);
+				document.addEventListener('keydown', handleKeyDown, { once: true});
 
 				// Set focus to the close button when modal opens
 				closeButton.focus();

@@ -1,3 +1,21 @@
+
+function getCurrentDateInTimezone(timezone) {
+    const date = new Date();
+
+    // Convert the date to the specified timezone and extract parts
+    const options = {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    };
+
+    const formatter = new Intl.DateTimeFormat('en-CA', options);
+    // 'en-CA' locale produces yyyy-mm-dd format
+    return formatter.format(date);
+}
+
+
 /**
  * Fetches crossword puzzles from SMH API
  * @param {string} date - Date in YYYY-MM-DD format
@@ -5,7 +23,7 @@
  */
 async function fetchSMHCrosswords(date) {
   // Format date to YYYY-MM-DD if not provided
-  const puzzleDate = date || new Date().toISOString().split('T')[0];
+  const puzzleDate = date || getCurrentDateInTimezone("Australia/Sydney").split('T')[0];
   
   const query = `
     query PuzzleQuery($input: PuzzlesByDateAndTypesInput!) {

@@ -179,9 +179,9 @@ async function handleConvert(request, env) {
       return new Response(JSON.stringify({
         success: true,
         filename: filename,
+        smhFilenames: smhFilenames,
         publicationDate: publicationDate,
-        url: fileUrl,
-        message: 'Crossword successfully converted and stored',
+        nytURL: fileUrl,
       }, null, 2), {
         headers: {
           'Content-Type': 'application/json',

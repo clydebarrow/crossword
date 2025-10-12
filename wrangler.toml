@@ -18,7 +18,7 @@ pattern = "mini.stubbs.me"
 custom_domain = true
 
 [triggers]
-crons = ["0 2 30 * *"]  # Run daily
+crons = ["30 2,16 * * *"]  # Run daily
 
 
 [assets]

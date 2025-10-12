@@ -58,11 +58,8 @@ export default {
   // Scheduled event handler
   async scheduled(event, env, ctx) {
     // Only run on production
-    if (env.ENVIRONMENT === 'production') {
-      // Use the existing handleConvert function
-      const request = new Request('https://crossword.stubbs.me/convert');
-      await handleConvert(request, env);
-    }
+    const request = new Request('https://crossword.stubbs.me/convert');
+    await handleConvert(request, env);
     return new Response('Scheduled task completed');
   },
 };

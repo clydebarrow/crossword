@@ -203,6 +203,14 @@ async function handleConvert(request, env) {
     results.errors.push(`SMH: ${error.message}`);
   }
 
+  // Clean up old entries (older than 1 month)
+  try {
+    await cleanupOldEntries(env);
+  } catch (error) {
+    // Log error but don't fail the request
+    console.error('Error cleaning up old entries:', error);
+  }
+
   // Determine response based on results
   if (results.nyt || results.smh) {
     // At least one source succeeded
@@ -243,6 +251,52 @@ async function handleConvert(request, env) {
         'Access-Control-Allow-Origin': '*',
       },
     });
+  }
+}
+
+/**
+ * Clean up entries older than 1 month from the R2 bucket
+ * @param {Object} env - Environment bindings
+ */
+async function cleanupOldEntries(env) {
+  const oneMonthAgo = new Date();
+  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+  
+  const deletedFiles = [];
+  let cursor = undefined;
+  
+  // List all objects in the bucket
+  do {
+    const listed = await env.CROSSWORD_BUCKET.list({
+      cursor: cursor,
+    });
+    
+    for (const object of listed.objects) {
+      // Check if object has uploadedAt metadata
+      if (object.customMetadata && object.customMetadata.uploadedAt) {
+        const uploadedAt = new Date(object.customMetadata.uploadedAt);
+        
+        // Delete if older than 1 month
+        if (uploadedAt < oneMonthAgo) {
+          await env.CROSSWORD_BUCKET.delete(object.key);
+          deletedFiles.push(object.key);
+        }
+      } else if (object.uploaded) {
+        // Fallback to uploaded date if customMetadata is not available
+        const uploadedAt = new Date(object.uploaded);
+        
+        if (uploadedAt < oneMonthAgo) {
+          await env.CROSSWORD_BUCKET.delete(object.key);
+          deletedFiles.push(object.key);
+        }
+      }
+    }
+    
+    cursor = listed.truncated ? listed.cursor : undefined;
+  } while (cursor);
+  
+  if (deletedFiles.length > 0) {
+    console.log(`Deleted ${deletedFiles.length} old files:`, deletedFiles);
   }
 }
 

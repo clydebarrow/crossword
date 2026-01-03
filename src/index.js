@@ -113,86 +113,129 @@ async function handleLatest(request, env) {
  * Handle convert endpoint
  */
 async function handleConvert(request, env) {
+  const results = {
+    nyt: null,
+    smh: null,
+    errors: []
+  };
+
+  // Fetch NYT Mini crossword data
   try {
-      // Fetch the NYT Mini crossword data
-      const nytResponse = await fetch('https://www.nytimes.com/svc/crosswords/v6/puzzle/mini.json');
-      
-      if (!nytResponse.ok) {
-        throw new Error(`Failed to fetch NYT data: ${nytResponse.status}`);
+    const nytResponse = await fetch('https://www.nytimes.com/svc/crosswords/v6/puzzle/mini.json', {
+      headers: {
+        'x-games-auth-bypass': 'true'
       }
+    });
+    
+    if (!nytResponse.ok) {
+      throw new Error(`Failed to fetch NYT data: ${nytResponse.status}`);
+    }
 
-      const nytData = await nytResponse.json();
-      const puzzleData = nytData.body[0];
-      
-      // Convert to IPUZ format (pass both puzzleData and root-level metadata)
-      const ipuzData = convertToIPUZ(puzzleData, nytData);
-      
-      // Fetch, convert, and store the three SMH crosswords
-      const smhCrosswords = await fetchSMHCrosswords();
-      const smhPuzzles = smhCrosswords.puzzles.map(crossword => ({
-        ...convertSMHToIPUZ(crossword),
-        originalData: crossword // Keep original data for metadata
-      }));
-      
-      const smhFilenames = smhPuzzles.map((puzzle, index) => {
-        // Use difficulty from original data or fallback to index
-        const puzzleType = puzzle.originalData?.difficulty?.toLowerCase() || `puzzle-${index + 1}`;
-        const date = puzzle.originalData?.date || new Date().toISOString().split('T')[0];
-        return `smh-${puzzleType}-${date}.ipuz`;
-      });
-      
-      await Promise.all(smhPuzzles.map((puzzle, index) => {
-          // Remove the originalData before saving
-          const {originalData, ...puzzleData} = puzzle;
-          return env.CROSSWORD_BUCKET.put(smhFilenames[index], JSON.stringify(puzzleData, null, 2), {
-              httpMetadata: {
-                  contentType: 'application/json',
-              },
-              customMetadata: {
-                  publicationDate: new Date().toISOString(),
-                  source: 'smh',
-                  uploadedAt: new Date().toISOString(),
-              },
-          });
-      }));
-      
-      // Generate filename from publication date (at root level)
-      const publicationDate = nytData.publicationDate;
-      const filename = `nyt-mini-${publicationDate}.ipuz`;
-      
-      // Store in R2 bucket
-      await env.CROSSWORD_BUCKET.put(filename, JSON.stringify(ipuzData, null, 2), {
-        httpMetadata: {
-          contentType: 'application/json',
-        },
-        customMetadata: {
-          publicationDate: publicationDate,
-          source: 'nyt-mini',
-          uploadedAt: new Date().toISOString(),
-        },
-      });
-
-      // Generate public URL (requires public bucket or custom domain)
-      const bucketUrl = env.PUBLIC_BUCKET_URL || `https://pub-<your-id>.r2.dev`;
-      const fileUrl = `${bucketUrl}/${filename}`;
-
-      return new Response(JSON.stringify({
-        success: true,
-        filename: filename,
-        smhFilenames: smhFilenames,
+    const nytData = await nytResponse.json();
+    const puzzleData = nytData.body[0];
+    
+    // Convert to IPUZ format (pass both puzzleData and root-level metadata)
+    const ipuzData = convertToIPUZ(puzzleData, nytData);
+    
+    // Generate filename from publication date (at root level)
+    const publicationDate = nytData.publicationDate;
+    const filename = `nyt-mini-${publicationDate}.ipuz`;
+    
+    // Store in R2 bucket
+    await env.CROSSWORD_BUCKET.put(filename, JSON.stringify(ipuzData, null, 2), {
+      httpMetadata: {
+        contentType: 'application/json',
+      },
+      customMetadata: {
         publicationDate: publicationDate,
-        nytURL: fileUrl,
-      }, null, 2), {
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-        },
-      });
+        source: 'nyt-mini',
+        uploadedAt: new Date().toISOString(),
+      },
+    });
 
+    // Generate public URL (requires public bucket or custom domain)
+    const bucketUrl = env.PUBLIC_BUCKET_URL || `https://pub-<your-id>.r2.dev`;
+    const fileUrl = `${bucketUrl}/${filename}`;
+
+    results.nyt = {
+      filename: filename,
+      publicationDate: publicationDate,
+      url: fileUrl,
+    };
   } catch (error) {
+    results.errors.push(`NYT: ${error.message}`);
+  }
+
+  // Fetch, convert, and store the three SMH crosswords
+  try {
+    const smhCrosswords = await fetchSMHCrosswords();
+    const smhPuzzles = smhCrosswords.puzzles.map(crossword => ({
+      ...convertSMHToIPUZ(crossword),
+      originalData: crossword // Keep original data for metadata
+    }));
+    
+    const smhFilenames = smhPuzzles.map((puzzle, index) => {
+      // Use difficulty from original data or fallback to index
+      const puzzleType = puzzle.originalData?.difficulty?.toLowerCase() || `puzzle-${index + 1}`;
+      const date = puzzle.originalData?.date || new Date().toISOString().split('T')[0];
+      return `smh-${puzzleType}-${date}.ipuz`;
+    });
+    
+    await Promise.all(smhPuzzles.map((puzzle, index) => {
+        // Remove the originalData before saving
+        const {originalData, ...puzzleData} = puzzle;
+        return env.CROSSWORD_BUCKET.put(smhFilenames[index], JSON.stringify(puzzleData, null, 2), {
+            httpMetadata: {
+                contentType: 'application/json',
+            },
+            customMetadata: {
+                publicationDate: new Date().toISOString(),
+                source: 'smh',
+                uploadedAt: new Date().toISOString(),
+            },
+        });
+    }));
+
+    results.smh = {
+      filenames: smhFilenames,
+    };
+  } catch (error) {
+    results.errors.push(`SMH: ${error.message}`);
+  }
+
+  // Determine response based on results
+  if (results.nyt || results.smh) {
+    // At least one source succeeded
+    const responseData = {
+      success: true,
+    };
+
+    if (results.nyt) {
+      responseData.filename = results.nyt.filename;
+      responseData.publicationDate = results.nyt.publicationDate;
+      responseData.nytURL = results.nyt.url;
+    }
+
+    if (results.smh) {
+      responseData.smhFilenames = results.smh.filenames;
+    }
+
+    if (results.errors.length > 0) {
+      responseData.partialSuccess = true;
+      responseData.errors = results.errors;
+    }
+
+    return new Response(JSON.stringify(responseData, null, 2), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
+  } else {
+    // Both sources failed
     return new Response(JSON.stringify({
       success: false,
-      error: error.message,
+      errors: results.errors,
     }, null, 2), {
       status: 500,
       headers: {

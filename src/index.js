@@ -123,7 +123,9 @@ async function handleConvert(request, env) {
   try {
     const nytResponse = await fetch('https://www.nytimes.com/svc/crosswords/v6/puzzle/mini.json', {
       headers: {
-        'x-games-auth-bypass': 'true'
+        'x-games-auth-bypass': 'true',
+        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+        'referer': 'https://www.nytimes.com/crosswords/game/mini'
       }
     });
     

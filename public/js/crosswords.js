@@ -795,9 +795,9 @@ function adjustColor(color, amount) {
 				$('.cw-header').html(`
 				    <a href="/">
                         <img class="cw-home" alt="home" src="img/home.svg" />
+                        <span class="cw-title">${escape(this.title)} ${escape(this.date)}</span>
+                        <span class="cw-author">by ${escape(this.author)}</span>
 				    </a>
-					<span class="cw-title">${escape(this.title)} ${escape(this.date)}</span>
-					<span class="cw-author">by ${escape(this.author)}</span>
 				${ this.notes ? `<button class="cw-button cw-button-notes">Notes</button>` : '' }
 					<span class="cw-flex-spacer"></span>
 					<span class="cw-copyright">${escape(this.copyright)}</span>

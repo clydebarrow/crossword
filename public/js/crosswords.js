@@ -793,7 +793,7 @@ function adjustColor(color, amount) {
 
 			completeLoad() {
 				$('.cw-header').html(`
-				    <a href="/">
+				    <a href="/" style="text-decoration: none;">
                         <img class="cw-home" alt="home" src="img/home.svg" />
                         <span class="cw-title">${escape(this.title)} ${escape(this.date)}</span>
                         <span class="cw-author">by ${escape(this.author)}</span>

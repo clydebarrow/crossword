@@ -486,7 +486,7 @@ async function generateHomePage(env) {
       border: 1px solid #e2e8f0;
       border-radius: 12px;
       padding: 16px 20px 20px;
-      margin-bottom: 24px;
+      margin-top: 32px;
     }
     .calendar-header {
       display: flex;
@@ -621,6 +621,7 @@ async function generateHomePage(env) {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
       gap: 14px;
+      margin-bottom: 8px;
     }
     .puzzle-card {
       display: flex;
@@ -669,6 +670,13 @@ async function generateHomePage(env) {
     <h1>Crossword Archive</h1>
     <p class="subtitle">Pick a day to see the available puzzles</p>
 
+    <div class="selected-day">
+      <div class="label">Selected day</div>
+      <div class="day-text" id="selectedDayText">—</div>
+    </div>
+
+    <div id="puzzleList" class="puzzle-list"></div>
+
     <div class="calendar">
       <div class="calendar-header">
         <button class="nav-btn" id="prevMonth" type="button" aria-label="Previous month">←</button>
@@ -680,13 +688,6 @@ async function generateHomePage(env) {
       </div>
       <div class="calendar-grid" id="calendarGrid"></div>
     </div>
-
-    <div class="selected-day">
-      <div class="label">Selected day</div>
-      <div class="day-text" id="selectedDayText">—</div>
-    </div>
-
-    <div id="puzzleList" class="puzzle-list"></div>
   </div>
 
   <script>

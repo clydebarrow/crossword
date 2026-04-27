@@ -1164,6 +1164,9 @@ function adjustColor(color, amount) {
 			renderCells() {
 				var x, y;
 				const SIZE_OFFSET = 4;
+				// Cap individual cell size so squares/text don't become huge on
+				// large screens (especially for small grids like 5x5 minis).
+				const MAX_CELL_SIZE = 56;
 
 				// Take care of the grid
 				const canvasRect = $('.cw-canvas').get(0).getBoundingClientRect();
@@ -1171,7 +1174,8 @@ function adjustColor(color, amount) {
 				const max_width = canvasRect.right - canvasRect.left;
 				this.cell_size = Math.min(
 					Math.floor(max_height / this.grid_height),
-					Math.floor(max_width / this.grid_width)
+					Math.floor(max_width / this.grid_width),
+					MAX_CELL_SIZE
 				);
 
 				// Scale the grid so it is crisp on high-density screens.

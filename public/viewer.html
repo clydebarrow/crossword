@@ -26,7 +26,24 @@
             margin: 0;
             background-color: white;
         }
-        div.crossword { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+        /* Cap the overall page width and center it horizontally so the layout
+           doesn't spread edge-to-edge on big screens. .cw-main is positioned
+           absolutely against this element, so making it position:relative
+           confines the whole solver UI to the capped width. */
+        div.crossword {
+            position: relative;
+            margin: 0 auto;
+            max-width: 1200px;
+            width: 100%;
+            height: 100vh;
+        }
+        /* Horizontally center the canvas, but pin it to the top so it stays
+           near the clues instead of floating to the middle of the viewport. */
+        .cw-canvas {
+            display: flex !important;
+            align-items: flex-start;
+            justify-content: center;
+        }
     </style>
 </head>
 <body>

@@ -406,13 +406,13 @@ async function listAllFiles(env) {
 }
 
 /**
- * Generate the home page HTML with tabbed interface for different puzzle types
+ * Generate the home page HTML with a date picker and per-day puzzle links
  */
 async function generateHomePage(env) {
   const files = await listAllFiles(env);
   const bucketUrl = env.PUBLIC_BUCKET_URL || 'https://pub-<your-id>.r2.dev';
-  
-  // Define puzzle types and their display names
+
+  // Define puzzle types and their display names (order = display order)
   const puzzleTypes = [
     { id: 'nyt-mini', name: 'NYT Mini' },
     { id: 'smh-crossword_mini', name: 'SMH Mini' },
@@ -420,101 +420,33 @@ async function generateHomePage(env) {
     { id: 'smh-crossword_cryptic', name: 'SMH Cryptic' }
   ];
 
-  // Process all puzzle types
-  const puzzlesByType = {};
-  
-  for (const type of puzzleTypes) {
-    const typePuzzles = files
-      .filter(f => f.key.startsWith(`${type.id}-`))
-      .map(f => {
-        const match = f.key.match(/([^-]+)-(\d{4})-(\d{2})-(\d{2})\.ipuz/);
-        if (match) {
-          const [_, puzzleType, year, month, day] = match;
-          return {
-            key: f.key,
-            type: type.id,
-            typeName: type.name,
-            date: `${year}-${month}-${day}`,
-            year,
-            month,
-            day,
-            url: `${bucketUrl}/${f.key}`,
-            uploaded: f.uploaded,
-          };
-        }
-        return null;
-      })
-      .filter(p => p !== null)
-      .sort((a, b) => b.date.localeCompare(a.date));
-    
-    // Group by year and month for archive view
-    const byYear = {};
-    typePuzzles.forEach(p => {
-      if (!byYear[p.year]) byYear[p.year] = {};
-      if (!byYear[p.year][p.month]) byYear[p.year][p.month] = [];
-      byYear[p.year][p.month].push(p);
-    });
-    
-    puzzlesByType[type.id] = {
-      name: type.name,
-      latest: typePuzzles[0] || null,
-      byYear,
-      all: typePuzzles
-    };
-  }
-  
-  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  
-  // Generate HTML for each tab content
-  const tabContents = puzzleTypes.map(type => {
-    const typeData = puzzlesByType[type.id];
-    if (!typeData || !typeData.latest) {
-      return `
-        <div id="${type.id}" class="tab-content">
-          <div class="latest">
-            <h2>Latest ${type.name} Puzzle</h2>
-            <p>No puzzles available yet.</p>
-          </div>
-        </div>`;
+  // Build a map of date -> { typeId: url } for all known puzzles.
+  // The key parser must match prefixes that themselves contain hyphens
+  // (e.g. "smh-crossword_mini"), so we match each known prefix explicitly.
+  const puzzlesByDate = {};
+  for (const f of files) {
+    for (const type of puzzleTypes) {
+      const prefix = `${type.id}-`;
+      if (!f.key.startsWith(prefix)) continue;
+      const rest = f.key.slice(prefix.length);
+      const m = rest.match(/^(\d{4}-\d{2}-\d{2})\.ipuz$/);
+      if (!m) continue;
+      const date = m[1];
+      if (!puzzlesByDate[date]) puzzlesByDate[date] = {};
+      puzzlesByDate[date][type.id] = `${bucketUrl}/${f.key}`;
+      break;
     }
-    
-    return `
-      <div id="${type.id}" class="tab-content ${type.id === 'nyt-mini' ? 'active' : ''}">
-        <div class="latest">
-          <h2>Latest ${type.name} Puzzle</h2>
-          <div class="puzzle">
-            <a href="/viewer.html?puzzle=${encodeURIComponent(typeData.latest.url)}" class="puzzle-link">
-              <span class="date">${new Date(typeData.latest.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
-              <span class="view">Solve &rarr;</span>
-            </a>
-          </div>
-        </div>
-        <div class="archive">
-          <h2>Archive</h2>
-          ${Object.entries(typeData.byYear).sort(([a], [b]) => b - a).map(([year, months]) => `
-            <div class="year">
-              <h3>${year}</h3>
-              <div class="months">
-                ${Object.entries(months).sort((a, b) => b[0] - a[0]).map(([month, puzzles]) => `
-                  <div class="month">
-                    <h4>${monthNames[parseInt(month) - 1]}</h4>
-                    <div class="puzzles">
-                      ${puzzles.map(puzzle => `
-                        <a href="/viewer.html?puzzle=${encodeURIComponent(puzzle.url)}" class="puzzle-link">
-                          <span class="date">${puzzle.day}</span>
-                        </a>
-                      `).join('')}
-                    </div>
-                  </div>
-                `).join('')}
-              </div>
-            </div>
-          `).join('')}
-        </div>
-      </div>`;
-  }).join('\n');
-  
+  }
+
+  const availableDates = Object.keys(puzzlesByDate).sort();
+  const minDate = availableDates[0] || '';
+  const maxDate = availableDates[availableDates.length - 1] || '';
+
+  // Server-side defaults for the initial render. Client-side JS will pick
+  // today's local date if puzzles exist for it, otherwise the most recent.
+  const todayUTC = new Date().toISOString().split('T')[0];
+  const initialDate = puzzlesByDate[todayUTC] ? todayUTC : maxDate;
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -547,200 +479,371 @@ async function generateHomePage(env) {
       margin-bottom: 30px;
       font-size: 1.1em;
     }
-    
-    /* Tabs */
-    .tabs {
-      display: flex;
-      margin-bottom: 20px;
-      border-bottom: 1px solid #e2e8f0;
-    }
-    .tab {
-      padding: 10px 20px;
-      cursor: pointer;
-      border: 1px solid transparent;
-      border-bottom: none;
-      border-radius: 6px 6px 0 0;
-      margin-right: 5px;
+
+    /* Calendar */
+    .calendar {
       background: #f7fafc;
-      color: #4a5568;
-      font-weight: 500;
-      transition: all 0.2s;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 16px 20px 20px;
+      margin-bottom: 24px;
     }
-    .tab:hover {
-      background: #edf2f7;
+    .calendar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
     }
-    .tab.active {
-      background: white;
-      border-color: #e2e8f0;
-      border-bottom-color: white;
+    .calendar-title {
       color: #2d3748;
-      margin-bottom: -1px;
+      font-weight: 600;
+      font-size: 1.15em;
     }
-    
-    .tab-content {
-      display: none;
-      padding: 20px 0;
+    .calendar-nav {
+      display: flex;
+      gap: 8px;
     }
-    .tab-content.active {
-      display: block;
+    .nav-btn {
+      background: white;
+      border: 1px solid #cbd5e0;
+      border-radius: 6px;
+      padding: 6px 12px;
+      cursor: pointer;
+      color: #4a5568;
+      font-size: 1em;
+      transition: all 0.15s;
     }
-    
-    .latest {
+    .nav-btn:hover:not(:disabled) {
+      background: #edf2f7;
+      color: #2d3748;
+    }
+    .nav-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+    }
+    .calendar-dow {
+      text-align: center;
+      color: #718096;
+      font-size: 0.78em;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 6px 0;
+    }
+    .calendar-day {
+      position: relative;
+      aspect-ratio: 1 / 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      background: white;
+      color: #4a5568;
+      cursor: pointer;
+      font-size: 0.95em;
+      transition: all 0.12s;
+      user-select: none;
+    }
+    .calendar-day.empty {
+      background: transparent;
+      border-color: transparent;
+      cursor: default;
+      color: transparent;
+    }
+    .calendar-day.other-month {
+      color: #cbd5e0;
+      background: #fafbfc;
+    }
+    .calendar-day.has-puzzles {
+      color: #2d3748;
+      font-weight: 600;
+    }
+    .calendar-day.has-puzzles::after {
+      content: '';
+      position: absolute;
+      bottom: 5px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #667eea;
+    }
+    .calendar-day.no-puzzles {
+      color: #a0aec0;
+      cursor: not-allowed;
+    }
+    .calendar-day.today {
+      border-color: #cbd5e0;
+    }
+    .calendar-day:hover.has-puzzles {
+      background: #edf2f7;
+      border-color: #667eea;
+    }
+    .calendar-day.selected,
+    .calendar-day.selected.has-puzzles,
+    .calendar-day.selected.no-puzzles {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-color: transparent;
+    }
+    .calendar-day.selected.has-puzzles::after {
+      background: white;
+    }
+
+    .selected-day {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
       padding: 25px;
       border-radius: 12px;
-      margin-bottom: 30px;
+      margin-bottom: 24px;
     }
-    .latest h2 {
-      margin-bottom: 15px;
-      font-size: 1.5em;
+    .selected-day .label {
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 0.8em;
+      opacity: 0.85;
+      margin-bottom: 6px;
     }
-    .puzzle-link {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      color: white;
-      text-decoration: none;
-      padding: 15px 0;
-      border-bottom: 1px solid rgba(255,255,255,0.2);
-    }
-    .puzzle-link:last-child {
-      border-bottom: none;
-    }
-    .puzzle-link:hover {
-      text-decoration: underline;
-    }
-    .puzzle-link .view {
-      opacity: 0.8;
-      font-size: 0.9em;
-    }
-    .puzzle-link:hover .view {
-      opacity: 1;
-    }
-    .archive {
-      margin-top: 40px;
-    }
-    .archive h2 {
-      color: #2d3748;
-      margin-bottom: 20px;
+    .selected-day .day-text {
       font-size: 1.8em;
+      font-weight: 600;
     }
-    .year {
-      margin-bottom: 30px;
-    }
-    .year h3 {
-      color: #4a5568;
-      margin-bottom: 15px;
-      font-size: 1.4em;
-    }
-    .months {
+
+    /* Crossword links */
+    .puzzle-list {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-      gap: 20px;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 14px;
     }
-    .month {
-      background: #f8fafc;
-      border-radius: 8px;
-      padding: 15px;
+    .puzzle-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 20px;
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      color: #2d3748;
+      text-decoration: none;
+      font-weight: 500;
+      transition: all 0.15s ease;
     }
-    .month h4 {
-      color: #4a5568;
-      margin-bottom: 10px;
+    .puzzle-card:hover {
+      border-color: #667eea;
+      box-shadow: 0 4px 14px rgba(102, 126, 234, 0.18);
+      transform: translateY(-1px);
+    }
+    .puzzle-card.disabled {
+      opacity: 0.5;
+      pointer-events: none;
+      background: #f7fafc;
+    }
+    .puzzle-card .arrow {
+      color: #667eea;
       font-size: 1.1em;
     }
-    .puzzles {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
-      gap: 8px;
-    }
-    .puzzles a {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: white;
-      color: #4a5568;
-      text-decoration: none;
-      height: 36px;
-      border-radius: 6px;
-      transition: all 0.2s;
-      border: 1px solid #e2e8f0;
-    }
-    .puzzles a:hover {
-      background: #edf2f7;
-      color: #2d3748;
+    .empty {
+      padding: 24px;
+      text-align: center;
+      color: #718096;
+      background: #f7fafc;
+      border: 1px dashed #cbd5e0;
+      border-radius: 10px;
     }
     @media (max-width: 768px) {
-      .container {
-        padding: 20px;
-      }
-      .tabs {
-        flex-wrap: wrap;
-      }
-      .tab {
-        margin-bottom: 5px;
-      }
+      .container { padding: 20px; }
+      .selected-day .day-text { font-size: 1.4em; }
+      .calendar { padding: 12px; }
     }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>Crossword Archive</h1>
-    <p class="subtitle">Browse and solve puzzles from different sources</p>
-    
-    <div class="tabs" id="puzzleTabs">
-      ${puzzleTypes.map(type => `
-        <div class="tab ${type.id === 'nyt-mini' ? 'active' : ''}" data-tab="${type.id}">
-          ${type.name}
+    <p class="subtitle">Pick a day to see the available puzzles</p>
+
+    <div class="calendar">
+      <div class="calendar-header">
+        <button class="nav-btn" id="prevMonth" type="button" aria-label="Previous month">←</button>
+        <div class="calendar-title" id="calendarTitle"></div>
+        <div class="calendar-nav">
+          <button class="nav-btn" id="todayBtn" type="button">Today</button>
+          <button class="nav-btn" id="nextMonth" type="button" aria-label="Next month">→</button>
         </div>
-      `).join('')}
+      </div>
+      <div class="calendar-grid" id="calendarGrid"></div>
     </div>
-    
-    ${tabContents}
+
+    <div class="selected-day">
+      <div class="label">Selected day</div>
+      <div class="day-text" id="selectedDayText">—</div>
+    </div>
+
+    <div id="puzzleList" class="puzzle-list"></div>
   </div>
-  
+
   <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const tabs = document.querySelectorAll('.tab');
-      const tabContents = document.querySelectorAll('.tab-content');
-      
-      // Function to set active tab
-      const setActiveTab = (tabId) => {
-        // Remove active class from all tabs and contents
-        tabs.forEach(t => t.classList.remove('active'));
-        tabContents.forEach(c => c.classList.remove('active'));
-        
-        // Add active class to selected tab and corresponding content
-        const selectedTab = document.querySelector('.tab[data-tab="' + tabId + '"]');
-        if (selectedTab) {
-          selectedTab.classList.add('active');
-          document.getElementById(tabId).classList.add('active');
-          // Save to localStorage
-          localStorage.setItem('selectedTab', tabId);
-        } else {
-          // Default to first tab if saved tab not found
-          const defaultTab = tabs[0];
-          if (defaultTab) {
-            const defaultTabId = defaultTab.getAttribute('data-tab');
-            defaultTab.classList.add('active');
-            document.getElementById(defaultTabId).classList.add('active');
-            localStorage.setItem('selectedTab', defaultTabId);
-          }
+    const PUZZLE_TYPES = ${JSON.stringify(puzzleTypes)};
+    const PUZZLES_BY_DATE = ${JSON.stringify(puzzlesByDate)};
+    const AVAILABLE_DATES = ${JSON.stringify(availableDates)};
+    const SERVER_INITIAL_DATE = ${JSON.stringify(initialDate)};
+
+    const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
+                         'July', 'August', 'September', 'October', 'November', 'December'];
+    const DOW_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    const calendarTitle = document.getElementById('calendarTitle');
+    const calendarGrid = document.getElementById('calendarGrid');
+    const selectedDayText = document.getElementById('selectedDayText');
+    const puzzleList = document.getElementById('puzzleList');
+    const prevMonthBtn = document.getElementById('prevMonth');
+    const nextMonthBtn = document.getElementById('nextMonth');
+    const todayBtn = document.getElementById('todayBtn');
+
+    function pad2(n) { return String(n).padStart(2, '0'); }
+    function isoFromYMD(y, m, d) { return y + '-' + pad2(m + 1) + '-' + pad2(d); }
+    function localTodayISO() {
+      const d = new Date();
+      return isoFromYMD(d.getFullYear(), d.getMonth(), d.getDate());
+    }
+    function parseISO(iso) {
+      const [y, m, d] = iso.split('-').map(Number);
+      return { y: y, m: m - 1, d: d };
+    }
+    function formatLongDate(iso) {
+      const p = parseISO(iso);
+      return new Date(p.y, p.m, p.d).toLocaleDateString(undefined, {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+      });
+    }
+
+    let viewYear, viewMonth; // month is 0-indexed
+    let selectedDate = null;
+    const today = localTodayISO();
+
+    function renderPuzzles(date) {
+      if (!date) {
+        selectedDayText.textContent = 'No date selected';
+        puzzleList.innerHTML = '<div class="empty">No puzzles available.</div>';
+        return;
+      }
+      selectedDayText.textContent = formatLongDate(date);
+      const available = PUZZLES_BY_DATE[date] || {};
+      const cards = PUZZLE_TYPES.map(t => {
+        const url = available[t.id];
+        if (url) {
+          const href = '/viewer.html?puzzle=' + encodeURIComponent(url);
+          return '<a class="puzzle-card" href="' + href + '">' +
+                 '<span>' + t.name + '</span>' +
+                 '<span class="arrow">Solve →</span>' +
+                 '</a>';
         }
-      };
-      
-      // Set initial active tab from localStorage or default to first tab
-      const savedTab = localStorage.getItem('selectedTab');
-      setActiveTab(savedTab || 'nyt-mini');
-      
-      // Add click handlers to all tabs
-      tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-          const tabId = tab.getAttribute('data-tab');
-          setActiveTab(tabId);
+        return '<div class="puzzle-card disabled">' +
+               '<span>' + t.name + '</span>' +
+               '<span class="arrow">Not available</span>' +
+               '</div>';
+      }).join('');
+      puzzleList.innerHTML = cards || '<div class="empty">No puzzles for this day.</div>';
+    }
+
+    function renderCalendar() {
+      calendarTitle.textContent = MONTH_NAMES[viewMonth] + ' ' + viewYear;
+
+      // Build day cells: leading days from previous month to align Sun as first column
+      const firstOfMonth = new Date(viewYear, viewMonth, 1);
+      const startDow = firstOfMonth.getDay();
+      const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+      const daysInPrevMonth = new Date(viewYear, viewMonth, 0).getDate();
+
+      let html = '';
+      for (const dow of DOW_NAMES) {
+        html += '<div class="calendar-dow">' + dow + '</div>';
+      }
+
+      // Previous month leading cells
+      for (let i = startDow - 1; i >= 0; i--) {
+        const day = daysInPrevMonth - i;
+        const prev = new Date(viewYear, viewMonth - 1, day);
+        const iso = isoFromYMD(prev.getFullYear(), prev.getMonth(), prev.getDate());
+        html += renderDayCell(iso, day, true);
+      }
+      // Current month
+      for (let day = 1; day <= daysInMonth; day++) {
+        const iso = isoFromYMD(viewYear, viewMonth, day);
+        html += renderDayCell(iso, day, false);
+      }
+      // Trailing cells to complete the final week (so the grid is rectangular)
+      const totalShown = startDow + daysInMonth;
+      const trailing = (7 - (totalShown % 7)) % 7;
+      for (let day = 1; day <= trailing; day++) {
+        const next = new Date(viewYear, viewMonth + 1, day);
+        const iso = isoFromYMD(next.getFullYear(), next.getMonth(), next.getDate());
+        html += renderDayCell(iso, day, true);
+      }
+
+      calendarGrid.innerHTML = html;
+
+      // Wire up clicks
+      calendarGrid.querySelectorAll('.calendar-day[data-date]').forEach(el => {
+        el.addEventListener('click', () => {
+          const iso = el.getAttribute('data-date');
+          const isOtherMonth = el.classList.contains('other-month');
+          if (isOtherMonth) {
+            const p = parseISO(iso);
+            viewYear = p.y;
+            viewMonth = p.m;
+          }
+          selectDate(iso);
         });
       });
-    });
+    }
+
+    function renderDayCell(iso, day, otherMonth) {
+      const has = !!PUZZLES_BY_DATE[iso];
+      const classes = ['calendar-day'];
+      if (otherMonth) classes.push('other-month');
+      if (has) classes.push('has-puzzles'); else classes.push('no-puzzles');
+      if (iso === today) classes.push('today');
+      if (iso === selectedDate) classes.push('selected');
+      return '<div class="' + classes.join(' ') + '" data-date="' + iso + '">' + day + '</div>';
+    }
+
+    function selectDate(iso) {
+      selectedDate = iso;
+      const p = parseISO(iso);
+      // If user picked a date outside the visible month via keyboard etc, sync the view.
+      if (p.y !== viewYear || p.m !== viewMonth) {
+        viewYear = p.y;
+        viewMonth = p.m;
+      }
+      renderCalendar();
+      renderPuzzles(iso);
+    }
+
+    function shiftMonth(delta) {
+      const d = new Date(viewYear, viewMonth + delta, 1);
+      viewYear = d.getFullYear();
+      viewMonth = d.getMonth();
+      renderCalendar();
+    }
+
+    prevMonthBtn.addEventListener('click', () => shiftMonth(-1));
+    nextMonthBtn.addEventListener('click', () => shiftMonth(1));
+    todayBtn.addEventListener('click', () => selectDate(localTodayISO()));
+
+    // Initial selection: today if available, else server-provided fallback (most recent puzzle date).
+    const initialDate = PUZZLES_BY_DATE[today] ? today : (SERVER_INITIAL_DATE || today);
+    const initParts = parseISO(initialDate);
+    viewYear = initParts.y;
+    viewMonth = initParts.m;
+    selectDate(initialDate);
   </script>
 </body>
 </html>`;
